@@ -22,6 +22,7 @@ async def upload_document(
     current_user: auth_models.User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ) -> schemas.DocumentDetail:
+    """Handle document upload, ingestion, and persistence of metadata."""
     if not file.filename:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Filename is required")
 
@@ -59,6 +60,7 @@ async def list_documents(
     current_user: auth_models.User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ) -> List[schemas.DocumentSummary]:
+    """Return the caller's documents ordered by recency."""
     statement = (
         select(models.Document)
         .where(models.Document.owner_user_id == current_user.id)
@@ -74,11 +76,13 @@ async def get_document(
     current_user: auth_models.User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ) -> schemas.DocumentDetail:
+    """Fetch a single document by id if it belongs to the caller."""
     document = await _get_document_or_404(session, document_id, current_user.id)
     return schemas.DocumentDetail.model_validate(document)
 
 
 async def _get_document_or_404(session: AsyncSession, document_id: int, user_id: int) -> models.Document:
+    """Return a document owned by the user or raise 404."""
     statement = select(models.Document).where(
         models.Document.id == document_id, models.Document.owner_user_id == user_id
     )

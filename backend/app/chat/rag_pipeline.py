@@ -32,6 +32,7 @@ except ImportError:  # pragma: no cover
 
 @dataclass
 class RetrievedChunk:
+    """Container for retrieved chunk metadata and content."""
     chunk_id: str
     document_id: int
     file_name: str
@@ -41,6 +42,7 @@ class RetrievedChunk:
 
 @dataclass
 class PipelineResult:
+    """Structured output from the RAG pipeline."""
     answer: str
     citations: List[chat_schemas.Citation]
     risk_highlights: List[str]
@@ -51,13 +53,16 @@ class AzureContentSafetyClient:
     """Stubbed client for Azure Content Safety integration."""
 
     def __init__(self) -> None:
+        """Record whether remote safety checks should run."""
         self.enabled = settings.environment != "local"
 
     def validate_user_input(self, text: str) -> None:
+        """Validate the inbound prompt for emptiness or disallowed content."""
         if not text.strip():
             raise ValueError("Question cannot be empty")
 
     def sanitize_model_output(self, text: str) -> str:
+        """Scrub the generated answer before returning it to callers."""
         return text.strip()
 
 
@@ -65,6 +70,7 @@ class AzureOpenAIChatClient:
     """Wrapper for Azure OpenAI chat completions with structured JSON responses."""
 
     def __init__(self) -> None:
+        """Instantiate the Azure OpenAI client or fallback mock."""
         self._client = None
         can_use_remote = (
             AsyncAzureOpenAI is not None
@@ -88,6 +94,7 @@ class AzureOpenAIChatClient:
         context_text: str,
         chunks: Sequence[RetrievedChunk],
     ) -> dict:
+        """Call Azure OpenAI (or fallback) to generate a structured answer."""
         messages = [
             {
                 "role": "system",
@@ -124,6 +131,7 @@ class AzureOpenAIChatClient:
 
     @staticmethod
     def _mock_response(question: str, chunks: Sequence[RetrievedChunk]) -> dict:
+        """Return deterministic responses when Azure OpenAI is unavailable."""
         snippets = [chunk.content[:200] for chunk in chunks]
         summary = " ".join(snippets)[:1200]
         if not summary:
@@ -155,6 +163,7 @@ class HybridRetriever:
     """Combines Azure AI Search with a SQL fallback for hybrid retrieval."""
 
     def __init__(self) -> None:
+        """Configure the Azure Search client if credentials are available."""
         self._client = None
         can_use_search = (
             SearchClient is not None
@@ -181,6 +190,7 @@ class HybridRetriever:
         session: AsyncSession,
         limit: Optional[int] = None,
     ) -> List[RetrievedChunk]:
+        """Fetch relevant chunks from Azure AI Search or the SQL fallback."""
         limit = limit or settings.rag_top_k
         if self._client is not None:
             try:  # pragma: no cover - network required
@@ -190,6 +200,7 @@ class HybridRetriever:
         return await self._retrieve_via_sql(query, user_id, session, limit)
 
     async def _retrieve_via_search(self, query: str, limit: int) -> List[RetrievedChunk]:  # pragma: no cover - network required
+        """Retrieve chunks via Azure AI Search."""
         results = await asyncio.to_thread(
             self._client.search,
             search_text=query,
@@ -215,6 +226,7 @@ class HybridRetriever:
         session: AsyncSession,
         limit: int,
     ) -> List[RetrievedChunk]:
+        """Retrieve chunks using SQL LIKE queries as a fallback."""
         keywords = [token for token in query.split() if len(token) > 2]
         statement = (
             select(document_models.DocumentChunk, document_models.Document)
@@ -248,6 +260,7 @@ class RAGPipeline:
     """Coordinates retrieval, answer generation, citations, and risk highlights."""
 
     def __init__(self) -> None:
+        """Initialize retriever, chat client, and safety helpers."""
         self.retriever = HybridRetriever()
         self.chat_client = AzureOpenAIChatClient()
         self.content_safety = AzureContentSafetyClient()
@@ -259,6 +272,7 @@ class RAGPipeline:
         user: auth_models.User,
         session: AsyncSession,
     ) -> PipelineResult:
+        """Execute the full pipeline: retrieve, reason, and build citations."""
         self.content_safety.validate_user_input(question)
         chunks = await self.retriever.retrieve(query=question, user_id=user.id, session=session, limit=settings.rag_top_k)
         if not chunks:
@@ -280,6 +294,7 @@ class RAGPipeline:
 
     @staticmethod
     def _build_context(chunks: Sequence[RetrievedChunk]) -> str:
+        """Construct a context string for the LLM prompt."""
         parts = []
         for idx, chunk in enumerate(chunks, start=1):
             parts.append(
@@ -289,6 +304,7 @@ class RAGPipeline:
 
     @staticmethod
     def _convert_to_citations(chunks: Sequence[RetrievedChunk]) -> List[chat_schemas.Citation]:
+        """Convert retrieved chunks into citation payloads."""
         citations = []
         for chunk in chunks:
             citations.append(
@@ -303,6 +319,7 @@ class RAGPipeline:
 
     @staticmethod
     def _derive_risk_highlights(chunks: Sequence[RetrievedChunk]) -> List[str]:
+        """Fallback heuristic for risk highlights when the LLM omits them."""
         highlights: List[str] = []
         for chunk in chunks:
             lowered = chunk.content.lower()

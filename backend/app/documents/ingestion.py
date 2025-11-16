@@ -52,12 +52,14 @@ DEFAULT_CHUNK_OVERLAP = 150
 
 @dataclass
 class TextSegment:
+    """Single logical segment of extracted text."""
     text: str
     page_number: Optional[int] = None
 
 
 @dataclass
 class ChunkPayload:
+    """Chunk data that will eventually be embedded and indexed."""
     chunk_id: str
     content: str
     page_number: Optional[int]
@@ -69,6 +71,7 @@ class BlobStorageClient:
     """Uploads files to Azure Blob Storage or a local fallback."""
 
     def __init__(self) -> None:
+        """Initialize Azure or local blob storage clients."""
         self.container_name = settings.azure_storage_container
         self.connection_string = settings.azure_storage_connection_string
         self._client = None
@@ -111,6 +114,7 @@ class AzureOpenAIEmbeddingClient:
     """Generates embeddings using Azure OpenAI with a local fallback."""
 
     def __init__(self) -> None:
+        """Instantiate Azure OpenAI embedding client or local fallback."""
         self._client = None
         use_remote = (
             AsyncAzureOpenAI is not None
@@ -129,6 +133,7 @@ class AzureOpenAIEmbeddingClient:
                 self._client = None
 
     async def embed_texts(self, texts: Sequence[str]) -> list[list[float]]:
+        """Generate embeddings for each chunk of text."""
         if not texts:
             return []
         if self._client is not None:
@@ -141,6 +146,7 @@ class AzureOpenAIEmbeddingClient:
 
     @staticmethod
     def _mock_embedding(text: str) -> list[float]:
+        """Produce deterministic pseudo-embeddings for local runs."""
         seed = sum(ord(ch) for ch in text) or 1
         return [((seed * (idx + 1)) % 997) / 997 for idx in range(32)]
 
@@ -149,6 +155,7 @@ class AzureAISearchIndexer:
     """Upserts chunk metadata into Azure AI Search (mockable)."""
 
     def __init__(self) -> None:
+        """Configure an Azure AI Search client or choose in-memory fallback."""
         self._client = None
         can_use_search = (
             SearchClient is not None
@@ -169,6 +176,7 @@ class AzureAISearchIndexer:
                 self._client = None
 
     async def upload_chunks(self, document: models.Document, chunks: Sequence[ChunkPayload]) -> None:
+        """Upload chunk metadata to the configured search index."""
         if not chunks:
             return
         documents = [
@@ -260,6 +268,7 @@ def extract_text_segments(file_path: Path) -> List[TextSegment]:
 
 
 def _extract_pdf(file_path: Path) -> List[TextSegment]:
+    """Extract text segments from a PDF file."""
     if PdfReader is None:
         raise RuntimeError("pypdf is not installed")
     reader = PdfReader(str(file_path))
@@ -273,6 +282,7 @@ def _extract_pdf(file_path: Path) -> List[TextSegment]:
 
 
 def _extract_docx(file_path: Path) -> List[TextSegment]:
+    """Extract paragraphs from a DOCX file."""
     if DocxDocument is None:
         raise RuntimeError("python-docx is not installed")
     doc = DocxDocument(str(file_path))
@@ -281,12 +291,14 @@ def _extract_docx(file_path: Path) -> List[TextSegment]:
 
 
 def _extract_txt(file_path: Path) -> List[TextSegment]:
+    """Extract line-by-line text from plain files."""
     text = file_path.read_text(encoding="utf-8", errors="ignore")
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     return [TextSegment(text=line, page_number=index + 1) for index, line in enumerate(lines)]
 
 
 def _extract_csv(file_path: Path) -> List[TextSegment]:
+    """Convert CSV rows into discrete segments."""
     segments: List[TextSegment] = []
     with file_path.open("r", encoding="utf-8", errors="ignore") as handle:
         reader = csv.reader(handle)
@@ -302,6 +314,7 @@ def chunk_text_segments(
     chunk_size: int = DEFAULT_CHUNK_SIZE,
     overlap: int = DEFAULT_CHUNK_OVERLAP,
 ) -> List[ChunkPayload]:
+    """Chunk text into overlapping windows ready for embedding."""
     chunks: List[ChunkPayload] = []
     buffer = ""
     start_page: Optional[int] = None

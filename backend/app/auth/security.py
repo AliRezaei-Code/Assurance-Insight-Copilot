@@ -25,23 +25,28 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Return True if the plaintext password matches the stored hash."""
     return pwd_context.verify(plain_password, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
+    """Hash the supplied password using bcrypt."""
     return pwd_context.hash(password)
 
 
 async def get_user_by_id(session: AsyncSession, user_id: int) -> Optional[models.User]:
+    """Fetch a user by primary key."""
     return await session.get(models.User, user_id)
 
 
 async def get_user_by_email(session: AsyncSession, email: str) -> Optional[models.User]:
+    """Retrieve a user using the normalized email address."""
     statement = select(models.User).where(models.User.email == email.lower())
     return await session.scalar(statement)
 
 
 async def authenticate_user(session: AsyncSession, email: str, password: str) -> Optional[models.User]:
+    """Validate provided credentials and return the matching user."""
     user = await get_user_by_email(session, email)
     if not user or not verify_password(password, user.password_hash):
         return None

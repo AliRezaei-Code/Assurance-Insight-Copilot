@@ -18,6 +18,7 @@ class DocumentStatus(str, Enum):
 
 
 class DocumentBase(BaseModel):
+    """Shared document fields surfaced in the API."""
     id: int
     file_name: str
     status: DocumentStatus
@@ -28,12 +29,15 @@ class DocumentBase(BaseModel):
 
 
 class DocumentSummary(DocumentBase):
+    """Summary row returned from listing endpoints."""
     owner_user_id: int
 
 
 class DocumentDetail(DocumentSummary):
+    """Detailed document representation including blob location."""
     blob_url: str
 
 
 class DocumentStatusUpdate(BaseModel):
+    """Payload for status mutation."""
     status: DocumentStatus

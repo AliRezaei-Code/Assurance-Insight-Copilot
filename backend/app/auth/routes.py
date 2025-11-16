@@ -15,6 +15,7 @@ async def register_user(
     payload: schemas.UserCreate,
     session: AsyncSession = Depends(get_db),
 ) -> schemas.UserRead:
+    """Register a new internal user and persist hashed credentials."""
     email = payload.email.lower()
     existing = await session.scalar(select(models.User).where(models.User.email == email))
     if existing:
@@ -32,6 +33,7 @@ async def login_user(
     payload: schemas.UserLogin,
     session: AsyncSession = Depends(get_db),
 ) -> schemas.Token:
+    """Exchange credentials for a signed JWT access token."""
     user = await session.scalar(select(models.User).where(models.User.email == payload.email.lower()))
     invalid_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -48,4 +50,5 @@ async def login_user(
 
 @router.get("/me", response_model=schemas.UserRead)
 async def read_current_user(current_user: models.User = Depends(get_current_user)) -> schemas.UserRead:
+    """Return the profile of the authenticated user."""
     return schemas.UserRead.model_validate(current_user)

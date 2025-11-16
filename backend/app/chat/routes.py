@@ -25,6 +25,7 @@ async def create_session(
     current_user: auth_models.User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ) -> schemas.ChatSessionRead:
+    """Create a new chat session for the authenticated user."""
     title = payload.title or f"Client insights {datetime.utcnow():%Y-%m-%d %H:%M}"
     chat_session = models.ChatSession(owner_user_id=current_user.id, title=title)
     session.add(chat_session)
@@ -38,6 +39,7 @@ async def list_sessions(
     current_user: auth_models.User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ) -> List[schemas.ChatSessionRead]:
+    """Return chat sessions owned by the current user."""
     statement = (
         select(models.ChatSession)
         .where(models.ChatSession.owner_user_id == current_user.id)
@@ -53,6 +55,7 @@ async def get_session_detail(
     current_user: auth_models.User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ) -> schemas.ChatSessionWithMessages:
+    """Return a session plus its ordered message history."""
     statement = (
         select(models.ChatSession)
         .options(selectinload(models.ChatSession.messages))
@@ -84,6 +87,7 @@ async def send_message(
     current_user: auth_models.User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ) -> schemas.ChatCompletionResponse:
+    """Persist a user question, run the RAG pipeline, and store the reply."""
     message_text = payload.message.strip()
     if not message_text:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Message cannot be empty")
@@ -129,6 +133,7 @@ async def _get_session_for_user(
     session_id: int,
     user_id: int,
 ) -> models.ChatSession:
+    """Fetch a chat session owned by the user or raise 404."""
     statement = select(models.ChatSession).where(
         models.ChatSession.id == session_id,
         models.ChatSession.owner_user_id == user_id,

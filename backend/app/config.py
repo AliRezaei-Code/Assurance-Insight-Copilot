@@ -5,6 +5,7 @@ from pydantic import Field
 
 
 class Settings(BaseSettings):
+    """Runtime configuration pulled from environment variables."""
     environment: str = Field(default="local")
     database_url: str = Field(default="sqlite+aiosqlite:///./assurance_insight.db")
     azure_openai_endpoint: str = Field(default="https://example-openai.openai.azure.com")
